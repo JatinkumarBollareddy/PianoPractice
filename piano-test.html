@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Piano Practice</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0c;
+  --surface: #13131a;
+  --surface2: #1c1c26;
+  --border: #252533;
+  --accent: #e8c97a;
+  --accent2: #7ab8e8;
+  --correct: #6dd98c;
+  --wrong: #e86d7a;
+  --text: #ededea;
+  --muted: #5a5a72;
+  --white-key-bg: #f2efe8;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── LOADER ── */
+#loader {
+  position:fixed; inset:0; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:20px; z-index:200;
+}
+#loader.hidden { display:none; }
+.loader-title { font-family:'Cormorant Garamond',serif; font-size:36px; color:var(--accent); }
+.loader-sub { font-size:13px; color:var(--muted); letter-spacing:.08em; }
+.loader-bar-wrap { width:220px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.loader-bar { height:100%; background:var(--accent); border-radius:2px; width:0%; transition:width .3s; }
+.loader-step { font-size:11px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+
+/* ── HEADER ── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; border-bottom:1px solid var(--border);
+  background:var(--surface); flex-shrink:0;
+}
+.logo { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--accent); }
+.mic-pill {
+  display:flex; align-items:center; gap:7px;
+  padding:5px 12px; border-radius:20px;
+  border:1px solid var(--border); background:var(--surface2);
+  font-size:11px; color:var(--muted); letter-spacing:.06em;
+}
+.mic-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); transition:all .3s; }
+.mic-dot.on { background:var(--correct); box-shadow:0 0 7px var(--correct); }
+.mic-dot.hearing { background:var(--accent); box-shadow:0 0 7px var(--accent); animation:blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── LESSON TABS ── */
+.lesson-tabs {
+  display:flex; gap:0; border-bottom:1px solid var(--border);
+  background:var(--surface); flex-shrink:0; overflow-x:auto;
+}
+.lesson-tab {
+  padding:12px 20px; font-size:12px; color:var(--muted);
+  cursor:pointer; border-bottom:2px solid transparent;
+  white-space:nowrap; transition:all .15s; letter-spacing:.04em;
+  flex-shrink:0;
+}
+.lesson-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.lesson-tab:hover:not(.active) { color:var(--text); }
+
+/* ── MAIN ── */
+.main {
+  flex:1; display:flex; flex-direction:column;
+  overflow:hidden; padding:16px 16px 10px;
+  gap:12px;
+}
+
+/* ── LESSON HEADER ── */
+.lesson-header { flex-shrink:0; }
+.lesson-title { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--text); margin-bottom:4px; }
+.lesson-desc { font-size:12px; color:var(--muted); line-height:1.6; }
+
+/* ── NOTE SEQUENCE ── */
+.sequence-wrap {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:16px; flex-shrink:0;
+}
+.sequence-label {
+  font-size:10px; text-transform:uppercase; letter-spacing:.12em;
+  color:var(--muted); margin-bottom:12px;
+}
+.sequence-scroll { overflow-x:auto; padding-bottom:4px; }
+.sequence {
+  display:flex; gap:7px; min-width:max-content;
+}
+.note-tile {
+  width:46px; height:50px; border-radius:7px;
+  border:1.5px solid var(--border);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:15px; font-weight:500; color:var(--muted);
+  transition:all .18s; flex-shrink:0; position:relative;
+}
+.note-tile .oct { font-size:9px; color:var(--muted); margin-top:1px; }
+.note-tile.current {
+  border-color:var(--accent); color:var(--accent);
+  background:rgba(232,201,122,.09);
+  box-shadow:0 0 14px rgba(232,201,122,.18);
+  transform:scale(1.08);
+}
+.note-tile.correct {
+  border-color:var(--correct); color:var(--correct);
+  background:rgba(109,217,140,.1);
+}
+.note-tile.wrong {
+  border-color:var(--wrong); color:var(--wrong);
+  background:rgba(232,109,122,.1);
+  animation:shake .28s ease;
+}
+.note-tile.done {
+  border-color:var(--border); color:var(--correct);
+  background:rgba(109,217,140,.05); opacity:.65;
+}
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+/* ── DETECTION PANEL ── */
+.detection-panel {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px;
+  display:flex; align-items:center; gap:16px; flex-shrink:0;
+}
+.big-note {
+  font-family:'Cormorant Garamond',serif; font-size:56px; font-weight:600;
+  color:var(--muted); width:72px; text-align:center; line-height:1;
+  transition:color .1s;
+}
+.big-note.active { color:var(--accent2); }
+.big-note.correct { color:var(--correct); }
+.big-note.wrong { color:var(--wrong); }
+.detection-meta { flex:1; display:flex; flex-direction:column; gap:8px; }
+.det-row { display:flex; align-items:center; gap:10px; }
+.det-lbl { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; width:60px; }
+.det-bar-bg { flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.det-bar { height:100%; border-radius:2px; transition:width .08s; background:var(--accent2); }
+.det-val { font-size:11px; color:var(--text); width:44px; text-align:right; }
+.target-label {
+  font-size:11px; color:var(--muted); text-align:center;
+  margin-top:4px; letter-spacing:.04em;
+}
+.target-note-display {
+  font-size:13px; color:var(--accent); font-weight:500;
+}
+
+/* ── CONTROLS ── */
+.controls {
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.btn {
+  padding:11px 24px; border-radius:8px;
+  font-family:'Outfit',sans-serif; font-size:12px;
+  letter-spacing:.08em; text-transform:uppercase; cursor:pointer;
+  border:1.5px solid var(--border); transition:all .15s; font-weight:500;
+}
+.btn-primary { background:var(--accent); color:#0a0a0c; border-color:var(--accent); }
+.btn-primary:hover { background:#efd48a; }
+.btn-primary:disabled { opacity:.35; cursor:not-allowed; }
+.btn-ghost { background:transparent; color:var(--muted); }
+.btn-ghost:hover { color:var(--text); border-color:var(--muted); }
+.status {
+  flex:1; font-size:12px; color:var(--muted);
+  letter-spacing:.04em; line-height:1.5;
+}
+.countdown {
+  font-family:'Cormorant Garamond',serif; font-size:38px;
+  color:var(--accent); width:44px; text-align:center; display:none;
+}
+
+/* ── PIANO ── */
+.piano-section {
+  flex-shrink:0; border-top:1px solid var(--border);
+  background:var(--surface); padding:12px 16px 14px;
+  overflow-x:auto;
+}
+.piano { position:relative; display:inline-flex; height:80px; }
+.wk {
+  width:30px; height:80px; background:var(--white-key-bg);
+  border:1px solid #c8c4bc; border-radius:0 0 4px 4px;
+  position:relative; flex-shrink:0; transition:background .08s;
+}
+.wk .klbl {
+  position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
+  font-size:8px; color:#aaa; font-family:'Outfit',sans-serif; pointer-events:none;
+}
+.bk {
+  width:18px; height:48px; background:#18181e;
+  position:absolute; top:0; border-radius:0 0 3px 3px;
+  z-index:2; border:1px solid #333; transition:background .08s;
+}
+.wk.hl-target { background:rgba(232,201,122,.55) !important; }
+.wk.hl-correct { background:rgba(109,217,140,.65) !important; }
+.wk.hl-wrong { background:rgba(232,109,122,.55) !important; }
+.wk.hl-play { background:rgba(122,184,232,.45) !important; }
+.bk.hl-target { background:rgba(232,201,122,.75) !important; }
+.bk.hl-correct { background:rgba(109,217,140,.75) !important; }
+.bk.hl-wrong { background:rgba(232,109,122,.7) !important; }
+.bk.hl-play { background:rgba(122,184,232,.65) !important; }
+
+/* ── RESULT OVERLAY ── */
+.result-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(10,10,12,.85); backdrop-filter:blur(8px);
+  z-index:100; align-items:center; justify-content:center;
+}
+.result-overlay.show { display:flex; }
+.result-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:36px 40px; text-align:center;
+  width:min(400px, 90vw);
+}
+.result-grade {
+  font-family:'Cormorant Garamond',serif; font-size:80px; line-height:1;
+  margin-bottom:4px;
+}
+.result-sublabel {
+  font-size:11px; text-transform:uppercase; letter-spacing:.12em;
+  color:var(--muted); margin-bottom:24px;
+}
+.result-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:24px;
+}
+.result-stat {
+  background:var(--surface2); border-radius:8px; padding:12px;
+}
+.result-stat-val {
+  font-family:'Cormorant Garamond',serif; font-size:26px; color:var(--text);
+}
+.result-stat-lbl {
+  font-size:10px; color:var(--muted); text-transform:uppercase;
+  letter-spacing:.08em; margin-top:3px;
+}
+.result-btns { display:flex; gap:10px; justify-content:center; }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-title">Piano Practice</div>
+  <div class="loader-sub">Loading audio engine</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loaderBar"></div></div>
+  <div class="loader-step" id="loaderStep">Initialising…</div>
+  <button class="btn btn-primary" id="loaderBtn" style="margin-top:8px">Start & Allow Mic</button>
+</div>
+
+<!-- RESULT -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="result-grade" id="resGrade"></div>
+    <div class="result-sublabel">Exercise Complete</div>
+    <div class="result-grid">
+      <div class="result-stat"><div class="result-stat-val" id="resAcc"></div><div class="result-stat-lbl">Accuracy</div></div>
+      <div class="result-stat"><div class="result-stat-val" id="resTune"></div><div class="result-stat-lbl">In-Tune</div></div>
+      <div class="result-stat"><div class="result-stat-val" id="resTries"></div><div class="result-stat-lbl">Avg Tries</div></div>
+      <div class="result-stat"><div class="result-stat-val" id="resTime"></div><div class="result-stat-lbl">Time</div></div>
+    </div>
+    <div class="result-btns">
+      <button class="btn btn-ghost" id="resRetry">Retry</button>
+      <button class="btn btn-primary" id="resNext">Next Lesson</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Piano Practice</div>
+  <div class="mic-pill">
+    <div class="mic-dot" id="micDot"></div>
+    <span id="micTxt">Loading</span>
+  </div>
+</header>
+
+<div class="lesson-tabs" id="lessonTabs"></div>
+
+<div class="main">
+  <div class="lesson-header">
+    <div class="lesson-title" id="lessonTitle"></div>
+    <div class="lesson-desc" id="lessonDesc"></div>
+  </div>
+
+  <div class="sequence-wrap">
+    <div class="sequence-label">Play these notes in order</div>
+    <div class="sequence-scroll">
+      <div class="sequence" id="sequence"></div>
+    </div>
+  </div>
+
+  <div class="detection-panel">
+    <div>
+      <div class="big-note" id="bigNote">–</div>
+      <div class="target-label">Target: <span class="target-note-display" id="targetDisplay">–</span></div>
+    </div>
+    <div class="detection-meta">
+      <div class="det-row">
+        <span class="det-lbl">Volume</span>
+        <div class="det-bar-bg"><div class="det-bar" id="volBar"></div></div>
+        <span class="det-val" id="volVal">–</span>
+      </div>
+      <div class="det-row">
+        <span class="det-lbl">Confidence</span>
+        <div class="det-bar-bg"><div class="det-bar" id="confBar"></div></div>
+        <span class="det-val" id="confVal">–</span>
+      </div>
+      <div class="det-row">
+        <span class="det-lbl">Cents off</span>
+        <div class="det-bar-bg"><div class="det-bar" id="centsBar" style="background:var(--accent)"></div></div>
+        <span class="det-val" id="centsVal">–</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startBtn" disabled>Start</button>
+    <button class="btn btn-ghost" id="retryBtn" style="display:none">Retry</button>
+    <div class="countdown" id="countdown"></div>
+    <div class="status" id="status">Loading engine…</div>
+  </div>
+</div>
+
+<div class="piano-section">
+  <div class="piano" id="piano"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// LESSONS
+// ═══════════════════════════════════════
+const LESSONS = [
+  {
+    id: 0,
+    title: "C Major Scale",
+    desc: "The foundation of piano. Play C D E F G A B C ascending, then back down. Right hand, starting on Middle C (C4). Focus on smooth, even notes.",
+    notes: ["C4","D4","E4","F4","G4","A4","B4","C5","B4","A4","G4","F4","E4","D4","C4"]
+  },
+  {
+    id: 1,
+    title: "Five-Finger Exercise",
+    desc: "Classic five-finger warm-up. C D E F G up and back down. Keep your wrist relaxed and fingers curved. Each finger gets one note: thumb=C, index=D, middle=E, ring=F, pinky=G.",
+    notes: ["C4","D4","E4","F4","G4","F4","E4","D4","C4"]
+  },
+  {
+    id: 2,
+    title: "Ode to Joy",
+    desc: "Beethoven's famous melody — your first real song. Listen to how it sounds before playing. The pattern E E F G / G F E D / C C D E / E D D will become very familiar.",
+    notes: ["E4","E4","F4","G4","G4","F4","E4","D4","C4","C4","D4","E4","E4","D4","D4"]
+  }
+];
+
+// ═══════════════════════════════════════
+// PIANO BUILDER
+// ═══════════════════════════════════════
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const WHITE_NOTES = ['C','D','E','F','G','A','B'];
+// black key offset from left of its white key group (in px, white key = 30px wide)
+const BLACK_POS = { 'C#':19, 'D#':49, 'F#':109, 'G#':139, 'A#':169 };
+
+function buildPiano() {
+  const piano = document.getElementById('piano');
+  piano.innerHTML = '';
+  // Render octaves 3, 4, 5
+  let whiteCount = 0;
+  const whiteEls = [];
+  for (let oct = 3; oct <= 5; oct++) {
+    WHITE_NOTES.forEach(n => {
+      const el = document.createElement('div');
+      el.className = 'wk';
+      el.dataset.note = n + oct;
+      if (n === 'C') {
+        const lbl = document.createElement('div');
+        lbl.className = 'klbl';
+        lbl.textContent = 'C' + oct;
+        el.appendChild(lbl);
+      }
+      piano.appendChild(el);
+      whiteEls.push({ el, note: n, oct });
+      whiteCount++;
+    });
+  }
+  piano.style.width = (whiteCount * 30) + 'px';
+
+  // Black keys
+  whiteEls.forEach((w, i) => {
+    const blackName = NOTE_NAMES[NOTE_NAMES.indexOf(w.note) + 1];
+    if (!blackName || !blackName.includes('#')) return;
+    if (!['C','D','F','G','A'].includes(w.note)) return;
+    const bk = document.createElement('div');
+    bk.className = 'bk';
+    bk.dataset.note = blackName + w.oct;
+    bk.style.left = (i * 30 + 19) + 'px';
+    piano.appendChild(bk);
+  });
+}
+
+function clearPianoHighlights() {
+  document.querySelectorAll('.wk,.bk').forEach(k => {
+    k.classList.remove('hl-target','hl-correct','hl-wrong','hl-play');
+  });
+}
+
+function highlightKey(noteStr, type) {
+  if (!noteStr) return;
+  const el = document.querySelector(`[data-note="${noteStr}"]`);
+  if (el) el.classList.add('hl-' + type);
+}
+
+// ═══════════════════════════════════════
+// PITCH DETECTION — MPM (fast, no deps)
+// ═══════════════════════════════════════
+function mpmDetect(buf, sr) {
+  const n = buf.length;
+  const nsdf = new Float32Array(n);
+  for (let tau = 0; tau < n; tau++) {
+    let acf = 0, m = 0;
+    for (let i = 0; i < n - tau; i++) {
+      acf += buf[i] * buf[i + tau];
+      m += buf[i] * buf[i] + buf[i + tau] * buf[i + tau];
+    }
+    nsdf[tau] = m === 0 ? 0 : 2 * acf / m;
+  }
+  const peaks = [];
+  let pos = false;
+  for (let i = 1; i < n - 1; i++) {
+    if (nsdf[i] > 0) pos = true;
+    if (pos && nsdf[i] > nsdf[i-1] && nsdf[i] >= nsdf[i+1]) peaks.push(i);
+    if (nsdf[i] < 0) pos = false;
+  }
+  if (!peaks.length) return null;
+  const thresh = 0.68 * Math.max(...peaks.map(i => nsdf[i]));
+  const sel = peaks.find(i => nsdf[i] >= thresh);
+  if (!sel) return null;
+  const y0 = nsdf[sel-1]||0, y1 = nsdf[sel], y2 = nsdf[sel+1]||0;
+  const denom = 2*(2*y1-y0-y2);
+  const tau = denom ? sel + (y2-y0)/denom : sel;
+  const freq = sr / tau;
+  if (freq < 60 || freq > 2100) return null;
+  return { freq, clarity: y1 };
+}
+
+// YIN — more robust on sustained notes
+function yinDetect(buf, sr) {
+  const n = buf.length >> 1;
+  const d = new Float32Array(n);
+  d[0] = 1;
+  let runSum = 0;
+  for (let tau = 1; tau < n; tau++) {
+    let s = 0;
+    for (let i = 0; i < n; i++) {
+      const diff = buf[i] - buf[i + tau];
+      s += diff * diff;
+    }
+    d[tau] = s;
+    runSum += s;
+    d[tau] = (d[tau] * tau) / runSum;
+  }
+  const threshold = 0.15;
+  for (let tau = 2; tau < n; tau++) {
+    if (d[tau] < threshold) {
+      while (tau + 1 < n && d[tau + 1] < d[tau]) tau++;
+      const freq = sr / tau;
+      if (freq < 60 || freq > 2100) return null;
+      const clarity = 1 - d[tau];
+      return { freq, clarity: Math.max(0, clarity) };
+    }
+  }
+  return null;
+}
+
+function freqToNoteObj(freq) {
+  if (!freq) return null;
+  const midi = 69 + 12 * Math.log2(freq / 440);
+  const midiR = Math.round(midi);
+  const cents = Math.abs((midi - midiR) * 100);
+  const oct = Math.floor(midiR / 12) - 1;
+  const idx = ((midiR % 12) + 12) % 12;
+  return { name: NOTE_NAMES[idx] + oct, noteName: NOTE_NAMES[idx], oct, cents };
+}
+
+function noteToFreq(noteStr) {
+  const m = noteStr.match(/^([A-G]#?)(\d+)$/);
+  if (!m) return null;
+  const idx = NOTE_NAMES.indexOf(m[1]);
+  const midi = (parseInt(m[2]) + 1) * 12 + idx;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+// ═══════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════
+let audioCtx, analyser, micStream;
+let rafId;
+let state = 'idle'; // idle | countdown | listening | done
+let lessonIdx = 0;
+let lesson = null;
+let noteIdx = 0;
+let triesPerNote = [], centsLog = [], noteAccepted = [];
+let currentTries = 0;
+let startTime = 0;
+let lastNote = null, lastNoteTime = 0;
+const LINGER = 280;
+const SEMI_TOLERANCE = 0.65;
+// Debounce: must detect same note for N consecutive frames before accepting
+let sameNoteFrames = 0;
+const FRAMES_REQUIRED = 3;
+let lastAcceptedNote = null;
+let lastAcceptTime = 0;
+const REACCEPT_GAP = 600; // ms before same note accepted again
+
+// ═══════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════
+async function initAudio() {
+  setLoaderStep('Requesting microphone…', 60);
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    setLoaderStep('Starting audio context…', 80);
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 4096;
+    analyser.smoothingTimeConstant = 0.25;
+    src.connect(analyser);
+    setLoaderStep('Ready!', 100);
+    document.getElementById('micDot').className = 'mic-dot on';
+    document.getElementById('micTxt').textContent = 'Mic on';
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('hidden');
+      buildPiano();
+      renderTabs();
+      selectLesson(0);
+      startAudioLoop();
+    }, 400);
+  } catch(e) {
+    setLoaderStep('Mic access denied — please allow and reload', 100);
+  }
+}
+
+function setLoaderStep(msg, pct) {
+  document.getElementById('loaderStep').textContent = msg;
+  document.getElementById('loaderBar').style.width = pct + '%';
+}
+
+// ═══════════════════════════════════════
+// AUDIO LOOP
+// ═══════════════════════════════════════
+function startAudioLoop() {
+  const fftSize = analyser.fftSize;
+  const buf = new Float32Array(fftSize);
+
+  function loop() {
+    rafId = requestAnimationFrame(loop);
+    analyser.getFloatTimeDomainData(buf);
+
+    // RMS volume
+    let sum = 0;
+    for (let i = 0; i < fftSize; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / fftSize);
+    const volPct = Math.min(100, rms * 500);
+
+    document.getElementById('volBar').style.width = volPct + '%';
+    document.getElementById('volVal').textContent = Math.round(volPct) + '%';
+
+    const now = Date.now();
+    const hasSound = rms > 0.010;
+
+    if (hasSound) {
+      document.getElementById('micDot').className = 'mic-dot hearing';
+    } else {
+      document.getElementById('micDot').className = 'mic-dot on';
+      sameNoteFrames = 0;
+    }
+
+    let detected = null;
+
+    if (hasSound) {
+      // Run both detectors, pick higher confidence
+      const r1 = mpmDetect(buf, audioCtx.sampleRate);
+      const r2 = yinDetect(buf, audioCtx.sampleRate);
+      let best = null;
+      if (r1 && r2) best = r1.clarity >= r2.clarity ? r1 : r2;
+      else best = r1 || r2;
+
+      if (best && best.clarity > 0.5) {
+        const noteObj = freqToNoteObj(best.freq);
+        if (noteObj) {
+          lastNote = { ...noteObj, clarity: best.clarity };
+          lastNoteTime = now;
+          detected = lastNote;
+        }
+      }
+    }
+
+    // Linger
+    if (!detected && lastNote && (now - lastNoteTime) < LINGER) {
+      detected = lastNote;
+    }
+
+    // Update UI
+    const bigEl = document.getElementById('bigNote');
+    const confBar = document.getElementById('confBar');
+    const confVal = document.getElementById('confVal');
+    const centsBar = document.getElementById('centsBar');
+    const centsVal = document.getElementById('centsVal');
+
+    if (detected) {
+      bigEl.textContent = detected.noteName;
+      bigEl.className = 'big-note active';
+      confBar.style.width = Math.round(detected.clarity * 100) + '%';
+      confVal.textContent = Math.round(detected.clarity * 100) + '%';
+      const centsPct = Math.min(100, detected.cents * 2);
+      centsBar.style.width = centsPct + '%';
+      centsVal.textContent = Math.round(detected.cents) + '¢';
+      if (state !== 'listening') highlightKey(detected.name, 'play');
+    } else {
+      bigEl.textContent = '–';
+      bigEl.className = 'big-note';
+      confBar.style.width = '0%';
+      confVal.textContent = '–';
+      centsBar.style.width = '0%';
+      centsVal.textContent = '–';
+      if (state !== 'listening') clearPianoHighlights();
+    }
+
+    // Exercise processing
+    if (state === 'listening' && detected && hasSound) {
+      processNote(detected, now);
+    }
+  }
+  loop();
+}
+
+// ═══════════════════════════════════════
+// EXERCISE LOGIC
+// ═══════════════════════════════════════
+function processNote(det, now) {
+  if (noteIdx >= lesson.notes.length) return;
+  const target = lesson.notes[noteIdx];
+  const tFreq = noteToFreq(target);
+  const dFreq = noteToFreq(det.name);
+  if (!tFreq || !dFreq) return;
+
+  const semiDiff = Math.abs(12 * Math.log2(dFreq / tFreq));
+  const isCorrect = semiDiff <= SEMI_TOLERANCE;
+
+  // Debounce: require consecutive frames of same note
+  if (det.name !== (lastAcceptedNote || '') || isCorrect) {
+    // If same note played too soon after last accept, skip
+    if (isCorrect && det.name === lastAcceptedNote && (now - lastAcceptTime) < REACCEPT_GAP) return;
+  }
+
+  if (isCorrect) {
+    sameNoteFrames++;
+    if (sameNoteFrames < FRAMES_REQUIRED) return;
+    sameNoteFrames = 0;
+
+    // Accept
+    centsLog.push(det.cents);
+    triesPerNote.push(currentTries + 1);
+    noteAccepted.push(true);
+    lastAcceptedNote = det.name;
+    lastAcceptTime = now;
+    currentTries = 0;
+
+    const tile = document.getElementById('t' + noteIdx);
+    if (tile) tile.className = 'note-tile correct';
+    clearPianoHighlights();
+    highlightKey(det.name, 'correct');
+
+    noteIdx++;
+
+    if (noteIdx >= lesson.notes.length) {
+      setTimeout(finishExercise, 500);
+    } else {
+      const nextTarget = lesson.notes[noteIdx];
+      const nextTile = document.getElementById('t' + noteIdx);
+      if (nextTile) nextTile.className = 'note-tile current';
+      scrollToCurrentTile();
+      clearPianoHighlights();
+      highlightKey(nextTarget, 'target');
+      document.getElementById('targetDisplay').textContent = nextTarget;
+      document.getElementById('status').textContent = `Note ${noteIdx+1} / ${lesson.notes.length} — play ${nextTarget}`;
+    }
+  } else {
+    sameNoteFrames = 0;
+    // Only count a "try" once per new wrong note attempt
+    const tile = document.getElementById('t' + noteIdx);
+    if (tile && !tile._wrongShowing) {
+      tile._wrongShowing = true;
+      tile.className = 'note-tile wrong';
+      clearPianoHighlights();
+      highlightKey(det.name, 'wrong');
+      highlightKey(target, 'target');
+      currentTries++;
+      setTimeout(() => {
+        if (tile) { tile.className = 'note-tile current'; tile._wrongShowing = false; }
+      }, 500);
+    }
+  }
+}
+
+function scrollToCurrentTile() {
+  const tile = document.getElementById('t' + noteIdx);
+  if (tile) tile.scrollIntoView({ behavior:'smooth', inline:'center', block:'nearest' });
+}
+
+// ═══════════════════════════════════════
+// LESSON UI
+// ═══════════════════════════════════════
+function renderTabs() {
+  const tabs = document.getElementById('lessonTabs');
+  tabs.innerHTML = '';
+  LESSONS.forEach((l, i) => {
+    const tab = document.createElement('div');
+    tab.className = 'lesson-tab' + (i === lessonIdx ? ' active' : '');
+    tab.textContent = l.title;
+    tab.addEventListener('click', () => {
+      if (state === 'listening' || state === 'countdown') return;
+      selectLesson(i);
+    });
+    tabs.appendChild(tab);
+  });
+}
+
+function selectLesson(idx) {
+  lessonIdx = idx;
+  lesson = LESSONS[idx];
+  state = 'idle';
+  noteIdx = 0; triesPerNote = []; centsLog = []; noteAccepted = [];
+  currentTries = 0; sameNoteFrames = 0;
+  lastAcceptedNote = null;
+
+  document.querySelectorAll('.lesson-tab').forEach((t,i) => {
+    t.classList.toggle('active', i === idx);
+  });
+
+  document.getElementById('lessonTitle').textContent = lesson.title;
+  document.getElementById('lessonDesc').textContent = lesson.desc;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('retryBtn').style.display = 'none';
+  document.getElementById('status').textContent = 'Ready — press Start when you are';
+  document.getElementById('targetDisplay').textContent = lesson.notes[0];
+  document.getElementById('resultOverlay').classList.remove('show');
+
+  renderSequence();
+  clearPianoHighlights();
+  highlightKey(lesson.notes[0], 'target');
+}
+
+function renderSequence() {
+  const seq = document.getElementById('sequence');
+  seq.innerHTML = '';
+  lesson.notes.forEach((note, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'note-tile' + (i === 0 ? ' current' : '');
+    tile.id = 't' + i;
+    const nn = note.replace(/\d/,'');
+    const oc = note.match(/\d+/)?.[0] || '';
+    tile.innerHTML = nn + `<span class="oct">${oc}</span>`;
+    seq.appendChild(tile);
+  });
+}
+
+// ═══════════════════════════════════════
+// COUNTDOWN + START
+// ═══════════════════════════════════════
+function startCountdown() {
+  state = 'countdown';
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('retryBtn').style.display = 'none';
+  const cd = document.getElementById('countdown');
+  cd.style.display = 'block';
+  document.getElementById('status').textContent = 'Get ready…';
+  let n = 3;
+  cd.textContent = n;
+  const iv = setInterval(() => {
+    n--;
+    if (n <= 0) { clearInterval(iv); cd.style.display='none'; beginExercise(); }
+    else cd.textContent = n;
+  }, 900);
+}
+
+function beginExercise() {
+  state = 'listening';
+  noteIdx = 0; triesPerNote = []; centsLog = []; noteAccepted = [];
+  currentTries = 0; sameNoteFrames = 0;
+  lastAcceptedNote = null; lastAcceptTime = 0;
+  startTime = Date.now();
+  renderSequence();
+  clearPianoHighlights();
+  highlightKey(lesson.notes[0], 'target');
+  document.getElementById('targetDisplay').textContent = lesson.notes[0];
+  document.getElementById('status').textContent = `Note 1 / ${lesson.notes.length} — play ${lesson.notes[0]}`;
+}
+
+// ═══════════════════════════════════════
+// FINISH
+// ═══════════════════════════════════════
+function finishExercise() {
+  state = 'done';
+  clearPianoHighlights();
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const acc = Math.round((noteAccepted.filter(Boolean).length / lesson.notes.length) * 100);
+  const avgTries = triesPerNote.length ? (triesPerNote.reduce((a,b)=>a+b,0)/triesPerNote.length).toFixed(1) : '1.0';
+  const avgCents = centsLog.length ? centsLog.reduce((a,b)=>a+b,0)/centsLog.length : 0;
+  const inTune = Math.max(0, Math.round(100 - avgCents * 1.8));
+
+  let grade, color;
+  if (acc >= 95) { grade='A'; color='var(--correct)'; }
+  else if (acc >= 80) { grade='B'; color='var(--accent)'; }
+  else if (acc >= 65) { grade='C'; color='var(--accent2)'; }
+  else { grade='D'; color='var(--wrong)'; }
+
+  document.getElementById('resGrade').textContent = grade;
+  document.getElementById('resGrade').style.color = color;
+  document.getElementById('resAcc').textContent = acc + '%';
+  document.getElementById('resTune').textContent = inTune + '%';
+  document.getElementById('resTries').textContent = avgTries;
+  document.getElementById('resTime').textContent = elapsed + 's';
+  document.getElementById('resultOverlay').classList.add('show');
+
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('retryBtn').style.display = '';
+  document.getElementById('status').textContent = 'Done!';
+}
+
+function retry() {
+  document.getElementById('resultOverlay').classList.remove('show');
+  selectLesson(lessonIdx);
+}
+
+// ═══════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════
+document.getElementById('loaderBtn').addEventListener('click', initAudio);
+document.getElementById('startBtn').addEventListener('click', startCountdown);
+document.getElementById('retryBtn').addEventListener('click', retry);
+document.getElementById('resRetry').addEventListener('click', retry);
+document.getElementById('resNext').addEventListener('click', () => {
+  const next = (lessonIdx + 1) % LESSONS.length;
+  document.getElementById('resultOverlay').classList.remove('show');
+  selectLesson(next);
+  renderTabs();
+});
+
+window.addEventListener('resize', buildPiano);
+</script>
+</body>
+</html>
